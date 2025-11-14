@@ -460,6 +460,7 @@ getRandomQuestions: async (req, res) => {
        }
       
        try {
+        const {id} = req.params;
         const  { name, email, phone} = req.body
         let nameResult = await teamRoles.checkNameExists(name)
         if(!nameResult){
@@ -475,6 +476,9 @@ getRandomQuestions: async (req, res) => {
         if(!phoneResult){
             throw {errorCode: "VALID_ERROR", message:'No Number Found'}
         }
+      
+      
+        await teamRoles.updateProfile({ id, name, email, phone });
 
         return res.status(200).json({message : `Profile updated successfully`, data: { name, email, phone }})
        } catch (error) {

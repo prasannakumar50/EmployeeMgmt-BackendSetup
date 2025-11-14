@@ -180,15 +180,16 @@ updatePassword: async (username, password, trx = null) => {
 },
 
 
-updateProfile: async(name, email, phone, trx=null)=>{
-  let knex = trx != null? trx: db;
-  
-   const result = knex("employee_details")
-   .where("employee_id", id)
-   .update(name, email, phone)
-   return await result
+updateProfile: async ({ id, name, email, phone }, trx = null) => {
+    console.log("Updating ID:", id);
+    const knex = trx ? trx : db;
 
+    const result =  knex("employee_details")
+        .where("employee_id", id)
+        .update({name,email,phone});
+         return await result;   
 },
+
 
 
   
