@@ -443,6 +443,48 @@ getRandomQuestions: async (req, res) => {
         }
     },
 
+    updateProfile: async(req, res)=>{
+          let formvalidation = Joi.object({
+            name: Joi.string().min(3).max(16).required(),
+            email: Joi.string().email().required(),
+            phone: Joi.string().min(10).max(20).required(),
+        })
+
+        let { error } = formvalidation.validate(req.body, { errors: { wrap: { label: false } }, abortEarly: false })
+        if (error) {
+        let errorDetails = error.details.map(err => ({
+            field: err.context.key,
+            message: err.message
+        }));
+        return res.status(422).json({ data: errorDetails });
+       }
+      
+       try {
+        const  { name, email, phone} = req.body
+        let nameResult = await teamRoles.checkNameExists(name)
+        if(!nameResult){
+           throw {errorCode: "VALID_ERROR", message:'No Name Found'}
+        }
+
+        let emailResult = await teamRoles.checkEmailExists(email)
+        if(!emailResult){
+           throw {errorCode: "VALID_ERROR", message:'No Email Found'}
+        }
+
+        let phoneResult = await teamRoles.checkNumberExists(phone)
+        if(!phoneResult){
+            throw {errorCode: "VALID_ERROR", message:'No Number Found'}
+        }
+
+        return res.status(200).json({message : `Profile updated successfully`, data: { name, email, phone }})
+       } catch (error) {
+            if (error.errorCode === "VALID_ERROR") {
+            return res.status(422).json({ message: error.message });
+        }
+        return res.status(409).json({ error: error.message });
+       }    
+    },
+
 
   checkUser: async(req, res)=>{
     try {

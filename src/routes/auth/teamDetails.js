@@ -7,6 +7,7 @@ router.post("/createRole", teamDetails.createRole);
 router.post("/username", teamDetails.checkUser);
 router.post("/answers", teamDetails.checkQuestions);
 router.put("/updatePwd", teamDetails.createNewPassword)
+router.post("/profileUpdate", teamDetails.updateProfile)
 
 // GET /0.1/getAllRoles
 router.get("/getAllRoles", teamDetails.getAllRoles);
