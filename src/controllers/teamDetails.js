@@ -4,6 +4,11 @@ const moment=require('moment')
 
 const teamRoles = require("../models/teamRoles");
 
+const fileValidate = require("../utils/fileValidate");
+const copyFile = require("../utils/copyFile");
+
+
+
 const teamDetails = {
   /**
    * @function [FunctionName]
@@ -443,51 +448,108 @@ getRandomQuestions: async (req, res) => {
         }
     },
 
-    updateProfile: async(req, res)=>{
-          let formvalidation = Joi.object({
-            name: Joi.string().min(3).max(16).required(),
-            email: Joi.string().email().required(),
-            phone: Joi.string().min(10).max(20).required(),
-        })
+updateProfile: async (req, res) => {
 
-        let { error } = formvalidation.validate(req.body, { errors: { wrap: { label: false } }, abortEarly: false })
-        if (error) {
-        let errorDetails = error.details.map(err => ({
+    const profile = "profile";   // <-- FIXED
+
+    // 1. Joi Validation
+    let formvalidation = Joi.object({
+        name: Joi.string().min(3).max(16).required(),
+        email: Joi.string().email().required(),
+        phone: Joi.string().min(10).max(20).required(),
+    });
+
+    let { error } = formvalidation.validate(req.body, {
+        errors: { wrap: { label: false } },
+        abortEarly: false
+    });
+
+    let errorDetails = [];
+
+    if (error) {
+        errorDetails = error.details.map(err => ({
             field: err.context.key,
             message: err.message
         }));
+    }
+
+    // 2. Image validation
+    if (req.file) {
+        const validate = fileValidate(req.file, [".jpg", ".jpeg", ".png", ".webp"], 2);
+        if (!validate.valid) {
+            errorDetails.push({
+                field: "image",
+                message: validate.message
+            });
+        }
+    }
+
+    if (errorDetails.length > 0) {
         return res.status(422).json({ data: errorDetails });
-       }
-      
-       try {
-        const {id} = req.params;
-        const  { name, email, phone} = req.body
-        let nameResult = await teamRoles.checkNameExists(name)
-        if(!nameResult){
-           throw {errorCode: "VALID_ERROR", message:'No Name Found'}
+    }
+
+    try {
+        const { id } = req.params;
+        const { name, email, phone } = req.body;
+
+        // 3. Get user
+        const user = await teamRoles.getEmployeeById(id);
+        if (!user || user.length === 0) {
+            throw { errorCode: "VALID_ERROR", message: "User not found" };
         }
 
-        let emailResult = await teamRoles.checkEmailExists(email)
-        if(!emailResult){
-           throw {errorCode: "VALID_ERROR", message:'No Email Found'}
+        const oldImage = user[0].image_url;   // <-- FIXED
+
+        // 4. Your custom validations
+        if (!await teamRoles.checkNameExists(name))
+            throw { errorCode: "VALID_ERROR", message: "No Name Found" };
+
+        if (!await teamRoles.checkEmailExists(email))
+            throw { errorCode: "VALID_ERROR", message: "No Email Found" };
+
+        if (!await teamRoles.checkNumberExists(phone))
+            throw { errorCode: "VALID_ERROR", message: "No Number Found" };
+
+        // 5. Build updated data
+        let updatedData = { name, email, phone };
+
+        // If file uploaded
+        if (req.file) {
+            updatedData.image_url = req.file.filename;
+
+            // Copy from tmp → uploads/profile
+            await copyFile(req.file, profile);
         }
 
-        let phoneResult = await teamRoles.checkNumberExists(phone)
-        if(!phoneResult){
-            throw {errorCode: "VALID_ERROR", message:'No Number Found'}
-        }
-      
-      
-        await teamRoles.updateProfile({ id, name, email, phone });
+        // 6. Update in DB
+        await teamRoles.updateProfile({ id, ...updatedData });
 
-        return res.status(200).json({message : `Profile updated successfully`, data: { name, email, phone }})
-       } catch (error) {
-            if (error.errorCode === "VALID_ERROR") {
+        // 7. Delete old image (ONLY if new uploaded)
+        if (req.file && oldImage) {
+            const removePath = path.join(
+                __dirname,
+                "..",
+                "uploads",
+                "profile",
+                oldImage
+            );
+            await deleteFile(removePath);
+        }
+
+        return res.status(200).json({
+            message: "Profile updated successfully",
+            data: updatedData
+        });
+
+    } catch (error) {
+        if (error.errorCode === "VALID_ERROR") {
             return res.status(422).json({ message: error.message });
         }
         return res.status(409).json({ error: error.message });
-       }    
-    },
+    }
+},
+
+
 
 
   checkUser: async(req, res)=>{
